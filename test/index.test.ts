@@ -2,7 +2,7 @@
 
 import {assert} from "chai";
 
-import {Children, createElement} from "react";
+import {Children, createElement, cloneElement} from "react";
 import {renderToString} from "react-dom/server";
 
 import {ReactElementPattern, mapReactElement, wrapType} from "../index";
@@ -15,11 +15,14 @@ function traceReactElementPattern(depth: number): ReactElementPattern {
         String(el, type) {
             console.log(depth, "E/S", type);
             if (el.props.children) {
-                Children.forEach(el.props.children, node => {
-                    mapReactNode(traceReactNodePattern(depth + 1))(node);
+                const newChildren = Children.map(el.props.children, node => {
+                    return mapReactNode(traceReactNodePattern(depth + 1))(node);
                 });
+
+                return cloneElement(el, el.props, ...newChildren);
+            } else {
+                return el;
             }
-            return el;
         },
         Component(el, type) {
             console.log(depth, "E/C", type);
@@ -65,8 +68,15 @@ function traceReactNodePattern(depth: number): ReactNodePattern {
 }
 
 function Test() {
+    return createElement(Test2);
+}
+function Test2() {
+    return createElement(Test3);
+}
+function Test3() {
     return createElement("svg");
 }
+
 
 describe("mapReactNode", () => {
   it("mapReactNode", () => {

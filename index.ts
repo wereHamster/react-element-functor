@@ -28,7 +28,6 @@ mapReactElement<T>(pattern: ReactElementPattern): (el: ReactElement<T>) => React
             return pattern.String(el, type);
         } else if (typeof type === "function") {
             return pattern.Component(el, type);
-            // return createElement(<any>wrapType(type, mapReactElement(pattern)), el.props);
         } else {
             throw new Error("mapReactElement: unknown type " + JSON.stringify(type));
         }
