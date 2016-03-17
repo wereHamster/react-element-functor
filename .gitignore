@@ -1,0 +1,8 @@
+/node_modules/
+/typings/
+
+/index.js
+/index.d.ts
+
+/test/index.test.js
+/test/index.test.d.ts
