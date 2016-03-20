@@ -2,11 +2,8 @@
 set -e
 cd "$(dirname "$0")/.."
 
-[ -z "$DEBUG" ] || set -x
-
 
 script/bootstrap
-
 
 ./node_modules/.bin/tsc
 ./node_modules/.bin/babel --presets es2015 -o test.main.js test.js
