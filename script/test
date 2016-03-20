@@ -5,6 +5,9 @@ cd "$(dirname "$0")/.."
 
 script/bootstrap
 
+
+./node_modules/.bin/tslint index.ts test.ts
+
 ./node_modules/.bin/tsc
 ./node_modules/.bin/babel --presets es2015 -o test.main.js test.js
 ./node_modules/.bin/mocha test.main.js
