@@ -1,8 +1,10 @@
-import { Component, Children } from "react";
-import { isValidElement, createElement, cloneElement } from "react";
-import { Props, ReactType, ReactElement, ReactNode, ReactChild,
+import { Component, isValidElement } from "react";
+import { ReactElement, ReactNode, ReactChild,
     ComponentClass, StatelessComponent } from "react";
 
+
+// TODO: Try to push this type alias upstream, to DefinitelyTyped.
+export type ReactComponentType<T> = ComponentClass<T> | StatelessComponent<T>;
 
 
 
@@ -14,18 +16,18 @@ import { Props, ReactType, ReactElement, ReactNode, ReactChild,
 //   - String (div, span, ...)
 //   - Component (class/stateful component or stateless component)
 
-export interface ReactElementPattern {
-    String(el: ReactElement<any>, type: string): ReactElement<any>;
-    Component(el: ReactElement<any>, type: ComponentClass<any> | StatelessComponent<any>): ReactElement<any>;
+export interface ReactElementPattern<T> {
+    String(el: ReactElement<any>, type: string, children: ReactNode): T;
+    Component(el: ReactElement<any>, type: ReactComponentType<any>): T;
 }
 
 export function
-mapReactElement<T>(pattern: ReactElementPattern): (el: ReactElement<T>) => ReactElement<T> {
+mapReactElement<T>(pattern: ReactElementPattern<T>): (el: ReactElement<any>) => T {
     return el => {
         const type = el.type;
 
         if (typeof type === "string") {
-            return pattern.String(el, type);
+            return pattern.String(el, type, (<any>el.props).children);
         } else if (typeof type === "function") {
             return pattern.Component(el, type);
         } else {
@@ -35,49 +37,19 @@ mapReactElement<T>(pattern: ReactElementPattern): (el: ReactElement<T>) => React
 }
 
 
-// Wrap a component class or stateless component in a new type so that we can
-// map over the returned ReactElement.
-
-const typeWrappers: WeakMap<any, any> = new WeakMap();
-
-export function
-wrapType(type: ComponentClass<any> | StatelessComponent<any>, f: (el: ReactElement<any>) => ReactElement<any>): ReactType {
-    let w = typeWrappers.get(type);
-
-    if (w === undefined) {
-        w = mkTypeWrapper(type, f);
-        typeWrappers.set(type, w);
-    }
-
-    return w;
-}
-
-function mkTypeWrapper(type: ComponentClass<any> | StatelessComponent<any>, f: (el: ReactElement<any>) => ReactElement<any>): ReactType {
-    if (type.prototype && type.prototype instanceof Component) {
-        return <any> class extends (<ComponentClass<any>>type.prototype.constructor) {
-            render() { return f(super.render()); }
-        };
-    } else {
-        return function(props, context) {
-            return f((<StatelessComponent<any>>type)(props, context));
-        };
-    }
-}
-
-
 
 // -----------------------------------------------------------------------------
 // Functor ReactChild
 
-export interface ReactChildPattern {
-    Null(): ReactChild;
-    String(x: string): ReactChild;
-    Number(x: number): ReactChild;
-    Element(x: ReactElement<any>): ReactChild;
+export interface ReactChildPattern<T> {
+    Null(): T;
+    String(x: string): T;
+    Number(x: number): T;
+    Element(x: ReactElement<any>): T;
 }
 
 export function
-mapReactChild(pattern: ReactChildPattern): (child: ReactChild) => ReactChild {
+mapReactChild<T>(pattern: ReactChildPattern<T>): (child: ReactChild) => T {
     return child => {
         if (child === null) {
             return pattern.Null();
@@ -98,14 +70,14 @@ mapReactChild(pattern: ReactChildPattern): (child: ReactChild) => ReactChild {
 // -----------------------------------------------------------------------------
 // Functor ReactNode
 
-export interface ReactNodePattern {
-    Boolean(x: boolean): ReactNode;
-    Fragment(x: Array<ReactNode>): ReactNode;
-    Child(x: ReactChild): ReactNode;
+export interface ReactNodePattern<T> {
+    Boolean(x: boolean): T;
+    Fragment(x: Array<ReactNode>): T;
+    Child(x: ReactChild): T;
 }
 
 export function
-mapReactNode(pattern: ReactNodePattern): (node: ReactNode) => ReactNode {
+mapReactNode<T>(pattern: ReactNodePattern<T>): (node: ReactNode) => T {
     return node => {
         if (typeof node === "boolean") {
             return pattern.Boolean(node);
@@ -115,4 +87,55 @@ mapReactNode(pattern: ReactNodePattern): (node: ReactNode) => ReactNode {
             return pattern.Child(<any>node);
         }
     };
+}
+
+
+
+// -----------------------------------------------------------------------------
+// ReactType (ComponentClass/StatelessComponent) wrappers
+//
+// Wrap a component class or stateless component in a new type so that we can
+// map over the returned ReactElement.
+//
+// Because ReactTypes must be comparable with the standard JavaScript equality
+// check, we need to cache the wrappers. This is done using a 'WeakMap' so that
+// unused types are automatically disposed.
+
+
+// Think of this as a cache where the key is the tuple [ReactComponentType,f].
+// But due to JavaScript restrictions, we can't use that and implement it
+// instead as a two-level cache.
+
+const componentTypeWrappers: WeakMap<any,WeakMap<any,any>> = new WeakMap();
+
+
+export function
+wrapComponentType(type: ReactComponentType<any>, f: (el: ReactElement<any>) => ReactElement<any>): ReactComponentType<any> {
+    let typeCache = componentTypeWrappers.get(type);
+
+    if (typeCache === undefined) {
+        typeCache = new WeakMap();
+        componentTypeWrappers.set(type, typeCache);
+    }
+
+    let wrapperType = typeCache.get(f);
+    if (wrapperType === undefined) {
+        wrapperType = mkComponentTypeWrapper(type, f);
+        typeCache.set(f, wrapperType);
+    }
+
+    return wrapperType;
+}
+
+
+function mkComponentTypeWrapper(type: ReactComponentType<any>, f: (el: ReactElement<any>) => ReactElement<any>): ReactComponentType<any> {
+    if (type.prototype && type.prototype instanceof Component) {
+        return <any> class extends (<ComponentClass<any>>type.prototype.constructor) {
+            render() { return f(super.render()); }
+        };
+    } else {
+        return function(props, context) {
+            return f((<StatelessComponent<any>>type)(props, context));
+        };
+    }
 }

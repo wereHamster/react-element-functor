@@ -4,5 +4,6 @@
 /index.js
 /index.d.ts
 
-/test/index.test.js
-/test/index.test.d.ts
+/test.js
+/test.main.js
+/test.d.ts
